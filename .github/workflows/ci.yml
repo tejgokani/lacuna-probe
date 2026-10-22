@@ -30,7 +30,7 @@ jobs:
           ! grep -E 'https?://' examples/sample-report/index.html | grep -v 'METHODOLOGY.md'
       - name: No em dashes anywhere
         run: |
-          ! LC_ALL=C.UTF-8 grep -rnP "\x{2014}" . --exclude-dir=.git --exclude-dir='*.egg-info'
+          ! LC_ALL=C.UTF-8 grep -rnIP "\x{2014}" . --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir='*.egg-info'
 
   lint:
     runs-on: ubuntu-latest

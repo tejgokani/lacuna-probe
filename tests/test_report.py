@@ -77,7 +77,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("<title>", self.html)
 
     def test_no_em_dash(self):
-        self.assertNotIn("\u2014", self.html)
+        self.assertNotIn(chr(0x2014), self.html)  # em dash, built at runtime so no .pyc holds it
 
     def test_not_labelled_simulated(self):
         self.assertNotIn("Simulated data", self.html)
