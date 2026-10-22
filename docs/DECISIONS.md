@@ -1,0 +1,41 @@
+# Design decisions
+
+One line each. Newest decisions at the bottom.
+
+- Python stdlib only at runtime. `tomli` is added on 3.10 only, because `tomllib` arrived in 3.11.
+- ICMP goes through the system `ping`, so no raw sockets and no root. The cost is parsing two output formats (iputils and BSD/macOS).
+- `icmp_seq` base is platform dependent: 1 on Linux, 0 on macOS. Parsing takes the base as a parameter.
+- The UDP header is 24 bytes little endian with an 8 byte cookie after it, so probes are at least 32 bytes.
+- HELLO must be at least 48 bytes and HELLO_ACK is 32, so the handshake can never amplify.
+- Echo is the probe with the type byte changed, so it is exactly as long as the probe.
+- The STATS request is padded to the size of the bitmap the client wants. The server truncates the reply to the request size if it would be larger.
+- Cookie is the first 8 bytes of HMAC-SHA256 over source IP, port and session id, keyed by a random per-start secret.
+- Server session slots free 5 seconds after a client fetches its stats. The 60 s idle expiry still applies to sessions that never finish. Found when the demo ran 12 runs in a row and hit the 8 session cap.
+- Per-IP rate limit is a 1 second fixed window of 200 packets. A client at the 200 pps hard cap will lose a few packets to it, so the demo sends 180 pps.
+- Maximum UDP probe count is 10944, the number of bits that fit in one 1400 byte STATS reply.
+- The loss sequence is stored as a hex bitstring, most significant bit first, 1 = lost, so any analysis can be redone later.
+- Jitter uses RTT as transit time because only the sender's clock is available.
+- Gilbert-Elliott fit is the simple Gilbert form (loss 0 in good, 1 in bad). Transition counts are pooled across runs without joining run ends.
+- "Random model rejected" uses the Wald-Wolfowitz runs test with Stouffer combination, threshold z < -1.96, and needs at least 10 lost packets.
+- Packet-loss statistics use UDP and ICMP rows only. TCP connect failures are a different event and are used only when nothing else exists.
+- Throughput `HOST:PORT` names the server's UDP port. TCP is port + 1, so one address works for both probes.
+- Throughput direction `up` takes its byte count from the server's reply. `down` counts bytes read by the client.
+- `retrans` is stored only for `up`, because for `down` the sender is the server and the client cannot see its retransmits.
+- `TCP_INFO` is parsed with a 104 byte struct (8 bytes then 24 u32). The read asks for 192 bytes and the parser checks the length it got.
+- "One throughput test at a time" is enforced with a `flock` lock file in the data directory.
+- Rate caps live in `config.py` and are checked in the CLI and when loading a config file.
+- Charts emit CSS classes, not colors, so one SVG works in light and dark mode. No xmlns attribute is written because the SVG is inline in HTML, and that keeps `grep 'https\?://'` clean.
+- The palette is Okabe-Ito, which is color-blind safe. Color means profile everywhere in the report, including the up/down bars (faded = downlink).
+- The report contains one URL, the link to `METHODOLOGY.md`, inside the footnote. A test and a CI step enforce it.
+- Timeline buckets to at most 240 points per series so long monitor runs stay small. Tooltips are drawn only for series of 150 points or fewer.
+- Hour-by-day heatmap uses the local time of the machine building the report.
+- The loss simulator only drops PROBE and ECHO packets. Handshake and stats packets pass, so the control plane is reliable and tests are deterministic.
+- The demo splits each round-trip loss target across uplink (2/3 of the log loss) and downlink (1/3), so the up/down chart has something to show.
+- The demo writes to `demo.db`, never to the real database, and truncates it on each run.
+- The demo sends 400 packets per run at 180 pps and uses RNG seeds derived from a fixed constant. Loss patterns are reproducible. RTT and jitter depend on the machine.
+- The demo TCP path is shaped to 50 Mbit/s per stream with 10 ms each way and has no packet loss, so the Mathis chart is explicitly not expected to match there. The report says so.
+- Extra modules and tests beyond the first layout: `demo.py` (keeps `cli.py` small), `tests/test_throughput.py`, `tests/test_cli.py`, `tests/fixtures/`.
+- `ping` missing is a `doctor` warning, not a failure, so the UDP and TCP features can still be used on minimal containers.
+- `lacuna doctor` and probe commands create the database directory if needed. Tests point `XDG_DATA_HOME` at a temp directory.
+- The macOS ping fixtures are captured from a real run. The Linux iputils fixtures are written by hand from the documented format, because development happened on a Mac.
+- SECURITY.md points to GitHub private vulnerability reporting instead of an email address.
