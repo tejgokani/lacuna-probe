@@ -1,0 +1,62 @@
+# Lacuna monitor config. Copy to ~/.config/lacuna/lacuna.toml, or pass --config FILE.
+# Every key is optional. Without a file, `lacuna monitor` uses the built-in default targets.
+
+# Label for the network you are on. Change it when you move networks, for example
+# "campus-wifi", "hotspot", "home-fiber". Default: the hostname.
+profile = "campus-wifi"
+
+# SQLite file. Default: $XDG_DATA_HOME/lacuna/lacuna.db
+# db = "~/lacuna.db"
+
+# One [[job]] table per probe. `every` takes 30s, 15m, 2h, 1d.
+# Rate caps apply: icmp <= 20 pps, udp <= 200 pps, tcp <= 10 connects/s, throughput <= 60 s.
+
+# ICMP through the system ping. interval is seconds between packets (0.2 = 5 pps).
+[[job]]
+kind = "icmp"
+target = "1.1.1.1"
+every = "5m"
+count = 20
+interval = 0.2
+
+[[job]]
+kind = "icmp"
+target = "8.8.8.8"
+every = "5m"
+count = 20
+
+# TCP connect time and refusals. Failed connects count as loss.
+[[job]]
+kind = "tcp"
+target = "1.1.1.1:443"
+every = "5m"
+count = 10
+interval = 0.5
+
+# UDP probe against your own `lacuna server`. This is the only probe that splits
+# loss into uplink and downlink. Replace the address with your server.
+# [[job]]
+# kind = "udp"
+# target = "203.0.113.10:9400"
+# every = "10m"
+# count = 500
+# pps = 20
+# size = 200
+
+# TCP throughput against the same server. The target port is the server's UDP
+# port. TCP uses that port + 1. direction is "up" or "down".
+# [[job]]
+# kind = "throughput"
+# target = "203.0.113.10:9400"
+# every = "30m"
+# secs = 10
+# streams = 2
+# direction = "down"
+
+# HTTP download test, counted until `secs` elapse.
+[[job]]
+kind = "http"
+target = "https://speed.cloudflare.com/__down?bytes=10000000"
+every = "15m"
+secs = 10
+streams = 4

@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: python -m pip install -e .
+      - name: Doctor
+        run: lacuna doctor
+      - name: Test
+        run: make test
+      - name: Demo
+        run: make demo
+      - name: Report has no external URLs outside the methodology footnote
+        run: |
+          ! grep -E 'https?://' examples/sample-report/index.html | grep -v 'METHODOLOGY.md'
+      - name: No em dashes anywhere
+        run: |
+          ! LC_ALL=C.UTF-8 grep -rnP "\x{2014}" . --exclude-dir=.git --exclude-dir='*.egg-info'
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install ruff
+      - run: ruff check src tests

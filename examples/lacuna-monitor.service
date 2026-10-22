@@ -1,0 +1,26 @@
+# systemd user unit. Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp examples/lacuna-monitor.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now lacuna-monitor
+#   loginctl enable-linger "$USER"      # keep it running after you log out
+# Logs: journalctl --user -u lacuna-monitor -f
+
+[Unit]
+Description=Lacuna network monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/lacuna monitor --config %h/.config/lacuna/lacuna.toml
+Restart=on-failure
+RestartSec=30
+# SIGTERM is handled: the monitor finishes the current probe and exits.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
