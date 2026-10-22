@@ -31,7 +31,7 @@ lacuna demo
 
 Or just type `lacuna` with no arguments. That opens the full-screen app described below.
 
-Requirements: Python 3.10 or newer. Runtime dependencies: none (Python 3.10 also needs `tomli`, which pip installs for you). No root. ICMP uses the system `ping` binary. Also works with `pip install .` and `pipx install .`.
+Requirements: Python 3.10 or newer. On Ubuntu and Debian the venv module is a separate package, so you may need `sudo apt install python3-venv` first (or `python3.X-venv` matching your Python, for example `python3.14-venv`). Runtime dependencies: none (Python 3.10 also needs `tomli`, which pip installs for you). No root. ICMP uses the system `ping` binary. Also works with `pip install .` and `pipx install .`.
 
 ## The app: just type `lacuna`
 

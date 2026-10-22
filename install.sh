@@ -17,8 +17,11 @@ python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' \
   || die "Python 3.10 or newer is required (found $(python3 -V 2>&1))"
 
 say "creating venv at $venv"
-python3 -m venv "$venv" 2>/dev/null \
-  || die "could not create a venv. Ubuntu: sudo apt install python3-venv"
+if ! python3 -m venv "$venv" >/dev/null 2>&1; then
+  [ -x "$venv/bin/pip" ] || rm -rf "$venv"   # drop the half-made venv, keep a working one
+  pyver="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+  die "could not create a venv. On Ubuntu or Debian run: sudo apt install python${pyver}-venv (older releases: python3-venv), then ./install.sh again"
+fi
 
 say "installing lacuna-probe"
 "$venv/bin/python" -m pip install --quiet --disable-pip-version-check "$here" \
