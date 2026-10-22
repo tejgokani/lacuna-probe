@@ -141,7 +141,8 @@ def profile_summary(profile: str, loss_rows: list[sqlite3.Row], tput_rows: list[
         tput_median=stats.median([r["mbps"] for r in tput_rows]),
         longest_burst=max(bursts) if bursts else None,
         ge=gilbert.fit_many(seqs) if seqs else None,
-        verdict=verdict_for(seqs),
+        verdict=verdict_for(seqs) if seqs or not rows else
+        f"Runs are shorter than {MIN_SEQ_LEN} packets, too short for burst analysis.",
     )
 
 

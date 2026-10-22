@@ -19,10 +19,28 @@
                          |
           +--------------+------------------+
           v              v                  v
-   report/html.py     tui.py          export.py
+   report/html.py     tui/ (app)        export.py
    report/svg.py
    analysis/*  (stats, gilbert, mathis): pure functions used by probes and report
 ```
+
+```
+ lacuna (no arguments, on a terminal)
+   |
+   v
+ tui/app.py  App: tab bar, status bar, key routing  -- curses driver is the only part that touches curses
+   |
+   +-- dashboard.py        reads the database, profile_summary(), sparklines
+   +-- probes.py           form -> build_job() -> monitor.run_job() + store() on a worker Task
+   +-- monitor_server.py   screens for the two background services
+   +-- report_settings.py  report.html / export, settings form
+   +-- help_screen.py      help center topics
+   +-- services.py         Context (shared state), MonitorController, ServerController
+   +-- settings.py         JSON settings, validation
+   +-- core.py             Line/Seg types, Form, Editor, Scroller, Task (no curses import)
+```
+
+Screens render to lists of styled segments and receive key names as strings, so the whole app is tested without a terminal. Only `app.py` imports `curses`, inside its driver functions.
 
 `lossim.py` and `demo.py` are test and demo helpers. They are never imported by the probes.
 
@@ -80,5 +98,6 @@ tput_samples(run_id -> runs, direction, streams, secs, bytes, mbps,
 ## Threads
 
 - `lacuna server`: one UDP thread, one TCP accept thread, one short-lived thread per TCP connection (max 16).
+- `lacuna` app: the UI loop is one thread. Probes, the demo, the monitor and the server each run on their own thread and never touch the screen. The UI polls them.
 - `lacuna monitor`: single thread, jobs run one at a time. A throughput test never overlaps another probe.
 - Throughput tests also take a lock file in the data directory, so two processes cannot run one at once.

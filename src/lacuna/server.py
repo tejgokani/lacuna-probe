@@ -152,6 +152,18 @@ class LacunaServer:
         return self.port + 1
 
     def start(self) -> LacunaServer:
+        try:
+            self._bind()
+        except OSError:
+            self._close_sockets()  # do not leak the UDP socket if the TCP port is taken
+            raise
+        for fn in (self._udp_loop, self._tcp_loop):
+            t = threading.Thread(target=fn, daemon=True, name=fn.__name__)
+            t.start()
+            self._threads.append(t)
+        return self
+
+    def _bind(self) -> None:
         self._udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._udp.bind((self.bind, self.port))
         self._udp.settimeout(0.25)
@@ -160,19 +172,18 @@ class LacunaServer:
         self._tcp.bind((self.bind, self.tcp_port))
         self._tcp.listen(32)
         self._tcp.settimeout(0.25)
-        for fn in (self._udp_loop, self._tcp_loop):
-            t = threading.Thread(target=fn, daemon=True, name=fn.__name__)
-            t.start()
-            self._threads.append(t)
-        return self
+
+    def _close_sockets(self) -> None:
+        for s in (self._udp, self._tcp):
+            if s:
+                s.close()
+        self._udp = self._tcp = None
 
     def stop(self) -> None:
         self._stop.set()
         for t in self._threads:
             t.join(timeout=2)
-        for s in (self._udp, self._tcp):
-            if s:
-                s.close()
+        self._close_sockets()
 
     def serve_forever(self) -> None:
         self.start()

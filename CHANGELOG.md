@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Bare `lacuna` opens a full-screen terminal app: Dashboard, Probes, Monitor, Server, Report, Settings and a Help center
+- Run any probe or the offline demo from forms, start and stop the monitor and server in the background, build reports and exports, edit and save settings
+- `lacuna tui` is the same app, and prints one snapshot when there is no terminal
+- Fix: `lacuna server` leaked its UDP socket when the TCP port was already in use
+- Clearer verdict for runs shorter than 50 packets
+- Probe result formatting moved to `fmt.py` and is shared by the CLI and the app
+
 ## 0.1.0
 
 First release.

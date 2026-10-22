@@ -29,7 +29,27 @@ lacuna demo
 
 `lacuna demo` runs for about 40 seconds with no internet and writes `lacuna-report.html`.
 
+Or just type `lacuna` with no arguments. That opens the full-screen app described below.
+
 Requirements: Python 3.10 or newer. Runtime dependencies: none (Python 3.10 also needs `tomli`, which pip installs for you). No root. ICMP uses the system `ping` binary. Also works with `pip install .` and `pipx install .`.
+
+## The app: just type `lacuna`
+
+Run `lacuna` with no arguments in a terminal and a full-screen app opens. Everything below is also available as commands, but you never need to remember one.
+
+| Screen | Keys | What it does |
+|---|---|---|
+| 1 Dashboard | `p` profile, `w` window, `d` demo data | Live loss, RTT, jitter, throughput, burst verdict and sparklines |
+| 2 Probes | `Enter` edit, `r` run | Ping, UDP, TCP, throughput and HTTP tests from a form, plus the offline demo |
+| 3 Monitor | `s` start or stop | Runs your probe jobs on a schedule in the background, with a live log |
+| 4 Server | `s` start or stop | Be the far end for UDP and throughput tests, see live sessions |
+| 5 Report | `r` HTML, `c` CSV, `j` JSON, `o` open | Pick profiles and a time window, write files |
+| 6 Settings | `Enter` edit | Profile name, database, refresh rate, server port, folders, colors. Saved as you go |
+| 7 Help | `?` from anywhere | Help center: probes explained, reading the numbers, safety, troubleshooting |
+
+`1` to `7` jump between screens, `Tab` cycles, `q` quits and stops anything it started. The app enforces the same rate caps as the CLI. It needs a terminal of at least 60 by 14. It uses `curses` from the standard library, so there is nothing extra to install.
+
+New here? Press `2`, move to the probe selector, choose "Offline demo", press `Enter`, then `1` and `d` once it finishes.
 
 ## How it fits together
 
@@ -56,6 +76,7 @@ Requirements: Python 3.10 or newer. Runtime dependencies: none (Python 3.10 also
 
 | Command | What it does |
 |---|---|
+| `lacuna` | Open the full-screen app (needs a terminal) |
 | `lacuna demo` | Offline end to end run: local server behind a loss simulator, builds a report |
 | `lacuna server` | UDP echo and TCP throughput server. Run it on the far end of the path |
 | `lacuna ping TARGET` | ICMP loss and RTT through the system `ping` |
@@ -64,7 +85,7 @@ Requirements: Python 3.10 or newer. Runtime dependencies: none (Python 3.10 also
 | `lacuna throughput HOST:PORT` | TCP up or down throughput to a Lacuna server, with `TCP_INFO` on Linux |
 | `lacuna throughput --url URL` | HTTP download throughput |
 | `lacuna monitor` | Run probes on a schedule until Ctrl+C |
-| `lacuna tui` | Live terminal view of the database |
+| `lacuna tui` | Same as `lacuna`. Without a terminal it prints one dashboard snapshot |
 | `lacuna report` | Build the HTML report |
 | `lacuna compare A B` | Two profiles side by side in the terminal |
 | `lacuna export` | CSV or JSON dump |
@@ -147,6 +168,7 @@ If `ping` fails inside a container, add `--cap-add NET_RAW`.
 
 ## Roadmap
 
+- Mouse support and charts in the app
 - IPv6
 - QUIC probe
 - Prometheus exporter

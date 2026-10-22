@@ -26,7 +26,8 @@ from lacuna.config import (
     default_profile,
     load_config,
 )
-from lacuna.db import Database, LossSample, TputSample, parse_since
+from lacuna.db import Database, LossSample, parse_since
+from lacuna.fmt import fnum, format_loss, format_tput, kv_table  # noqa: F401
 from lacuna.monitor import Monitor, Outcome, install_signal_handlers, run_job, store
 from lacuna.probes import split_host_port
 from lacuna.probes.icmp import PingError
@@ -35,60 +36,6 @@ from lacuna.probes.udp import UdpProbeError
 from lacuna.report.html import build_report, profile_summary
 
 RUNTIME_ERRORS = (OSError, PingError, UdpProbeError, ThroughputError)
-
-
-# ---- output helpers ----
-
-def kv_table(rows: list[tuple[str, str]]) -> str:
-    w = max(len(k) for k, _ in rows)
-    return "\n".join(f"{k:<{w}}  {v}" for k, v in rows)
-
-
-def _f(v: float | None, spec: str = ".2f") -> str:
-    return "n/a" if v is None else format(v, spec)
-
-
-def format_loss(job: Job, profile: str, s: LossSample) -> str:
-    rows = [
-        ("target", f"{job.target} ({job.kind})"),
-        ("profile", profile),
-        ("packets", f"{s.sent} sent, {s.recv} received"),
-        ("loss", f"{s.loss_pct:.2f} %"),
-    ]
-    if s.up_loss_pct is not None:
-        rows.append(("direction", f"uplink {s.up_loss_pct:.2f} %, downlink {_f(s.down_loss_pct)} %"))
-    rows.append(("rtt ms", "  ".join(f"{k} {_f(getattr(s, 'rtt_' + k), '.2f')}"
-                                     for k in ("min", "mean", "p50", "p95", "p99", "max"))))
-    rows.append(("jitter", f"{_f(s.jitter_ms)} ms"))
-    extra = f"longest burst {s.max_burst}"
-    if s.dup is not None:
-        extra += f", duplicates {s.dup}"
-    if s.reordered is not None:
-        extra += f", reordered {s.reordered}"
-    rows.append(("bursts", extra))
-    if s.ge_p is not None and s.ge_r:
-        rows.append(("gilbert", f"p {s.ge_p:.4f}  r {s.ge_r:.3f}  mean burst {1 / s.ge_r:.1f}"
-                     + ("  (small sample, treat as rough)" if s.sent < 200 else "")))
-    return kv_table(rows)
-
-
-def format_tput(job: Job, profile: str, s: TputSample, per: list[float]) -> str:
-    rows = [
-        ("target", f"{job.target} ({job.kind})"),
-        ("profile", profile),
-        ("direction", f"{s.direction}, {s.streams} stream(s), {s.secs:.1f} s"),
-        ("transferred", f"{s.bytes / 1e6:.2f} MB"),
-        ("throughput", f"{s.mbps:.2f} Mbit/s total"),
-    ]
-    if len(per) > 1:
-        rows.append(("per stream", "  ".join(f"{m:.2f}" for m in per) + " Mbit/s"))
-    if s.cwnd is None:
-        rows.append(("tcp_info", "not available on this OS"))
-    else:
-        retrans = "n/a (receiver side)" if s.retrans is None else str(s.retrans)
-        rows.append(("tcp_info", f"retrans {retrans}  cwnd {s.cwnd}  rtt {_f(s.rtt_ms, '.1f')} ms  "
-                                 f"ssthresh {s.ssthresh}"))
-    return kv_table(rows)
 
 
 # ---- probe commands ----
@@ -199,8 +146,7 @@ def cmd_monitor(args: argparse.Namespace) -> int:
 def cmd_tui(args: argparse.Namespace) -> int:
     from lacuna.tui import run_tui
 
-    run_tui(str(args.db or default_db_path()), args.profile)
-    return 0
+    return run_tui(args.db, args.profile)
 
 
 # ---- reporting ----
@@ -231,12 +177,12 @@ def cmd_compare(args: argparse.Namespace) -> int:
     rows = [
         ("packet runs", [str(c.loss_samples) for c in cols]),
         ("packets sent", [str(c.sent) for c in cols]),
-        ("mean loss %", [_f(c.loss_pct) for c in cols]),
-        ("p95 RTT ms", [_f(c.rtt_p95, ".1f") for c in cols]),
-        ("mean jitter ms", [_f(c.jitter_ms) for c in cols]),
-        ("median Mbit/s", [_f(c.tput_median, ".1f") for c in cols]),
+        ("mean loss %", [fnum(c.loss_pct) for c in cols]),
+        ("p95 RTT ms", [fnum(c.rtt_p95, ".1f") for c in cols]),
+        ("mean jitter ms", [fnum(c.jitter_ms) for c in cols]),
+        ("median Mbit/s", [fnum(c.tput_median, ".1f") for c in cols]),
         ("longest burst", [str(c.longest_burst if c.longest_burst is not None else "n/a") for c in cols]),
-        ("GE mean burst", [_f(1 / c.ge.r if c.ge and c.ge.r else None, ".1f") for c in cols]),
+        ("GE mean burst", [fnum(1 / c.ge.r if c.ge and c.ge.r else None, ".1f") for c in cols]),
     ]
     w = max(len(c.profile) for c in cols) + 2
     print(f"{'':<16}" + "".join(f"{c.profile:>{max(w, 12)}}" for c in cols))
@@ -411,6 +357,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if not getattr(args, "func", None):
+        given = sys.argv[1:] if argv is None else argv
+        if not given and sys.stdin.isatty() and sys.stdout.isatty():
+            from lacuna.tui import run_tui
+
+            return run_tui(None)
         parser.print_help()
         return 2
     try:

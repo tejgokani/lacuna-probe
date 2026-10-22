@@ -39,3 +39,12 @@ One line each. Newest decisions at the bottom.
 - `lacuna doctor` and probe commands create the database directory if needed. Tests point `XDG_DATA_HOME` at a temp directory.
 - The macOS ping fixtures are captured from a real run. The Linux iputils fixtures are written by hand from the documented format, because development happened on a Mac.
 - SECURITY.md points to GitHub private vulnerability reporting instead of an email address.
+- Bare `lacuna` opens a curses app when both stdin and stdout are terminals. Otherwise it prints help and exits 2, so scripts keep their old behavior.
+- The app is stdlib `curses` only. Screens return styled segments and take key names, so tests run without a terminal. A real tmux session was used to check the driver.
+- The app reuses `run_job`, `store`, `validate_job` and the CLI's result formatting (`fmt.py`), so a probe behaves the same in both places.
+- The app never exposes `--unsafe-rate`. A request above a hard cap is refused with a pointer to the CLI.
+- App settings live in `settings.json` as JSON, not TOML, because the standard library can write JSON and only read TOML. They do not change CLI behavior.
+- `--db` on `lacuna tui` is a session override and is never written to settings.
+- Probes and the monitor write to the real database only. The dashboard can show `demo.db` with `d`, and the status line and header say so.
+- Settings are written atomically (temp file, then rename). A damaged or odd settings file falls back to defaults per key.
+- `LacunaServer.start()` now closes the UDP socket if the TCP port is taken. Found when the app tried to start a server on a busy port.

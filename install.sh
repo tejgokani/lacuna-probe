@@ -39,4 +39,4 @@ esac
 say ""
 "$bin_dir/lacuna" doctor
 say ""
-say "next: lacuna demo"
+say "next: run lacuna to open the app, or lacuna demo for a 40 second offline tour"

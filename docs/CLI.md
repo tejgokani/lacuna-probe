@@ -95,13 +95,20 @@ Job keys:
 | `pps`, `size` | udp | 20, 200 |
 | `secs`, `streams`, `direction` | throughput, http | 10, 1, down |
 
-## tui
+## tui and the bare `lacuna` command
 
 ```bash
-lacuna tui [--profile NAME]
+lacuna
+lacuna tui [--profile NAME] [--db FILE]
 ```
 
-Curses view that re-reads the database every 2 seconds. Shows the last hour, the latest result per target and sparklines. `q` quits. Without a terminal it prints one snapshot.
+`lacuna` with no arguments, in a terminal, opens the full-screen app. `lacuna tui` does the same and accepts `--db` and `--profile` for that session only. Without a terminal (piped output, no TTY) `lacuna` prints help and `lacuna tui` prints one plain dashboard snapshot.
+
+Screens: Dashboard, Probes, Monitor, Server, Report, Settings, Help. Jump with `1` to `7`, cycle with `Tab`, open help with `?`, quit with `q` or Ctrl+C.
+
+Settings are stored in `$XDG_CONFIG_HOME/lacuna/settings.json` (`~/.config/lacuna/settings.json`) and apply to the app only: profile name, database file, default window, refresh seconds, monitor config path, server bind and port, report folder, colors. The app never offers `--unsafe-rate`.
+
+Probes run from the app are stored in your real database. The offline demo and the Dashboard's demo view use `demo.db` and never touch it.
 
 ## report
 
