@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lacuna-probe"
+dynamic = ["version"]
+description = "Measure real-world packet loss, jitter, RTT and throughput. Zero-dependency, runs on any Ubuntu box."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Tej Gokani" }]
+keywords = ["networking", "packet-loss", "throughput", "jitter", "network-monitoring", "udp", "tcp"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Education",
+    "Intended Audience :: System Administrators",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Networking :: Monitoring",
+]
+dependencies = ['tomli; python_version < "3.11"']
+
+[project.urls]
+Homepage = "https://github.com/tejgokani/lacuna-probe"
+Issues = "https://github.com/tejgokani/lacuna-probe/issues"
+
+[project.scripts]
+lacuna = "lacuna.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "lacuna.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
