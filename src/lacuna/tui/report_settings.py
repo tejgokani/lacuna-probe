@@ -9,7 +9,7 @@ from lacuna import export
 from lacuna.db import parse_since
 from lacuna.report.html import build_report
 from lacuna.tui import settings as cfg
-from lacuna.tui.core import Field, Form, L, Line
+from lacuna.tui.core import NUM, Field, Form, L, Line
 from lacuna.tui.services import Context
 
 
@@ -106,7 +106,7 @@ class ReportScreen:
             L(" Profiles to include", "hdr"),
         ]
         if not self.profiles:
-            lines.append(L("  No data yet. Run a probe first (screen 2).", "dim"))
+            lines.append(L("  No data yet. Run a probe first (Probes screen).", "dim"))
         for i, (name, n) in enumerate(self.profiles):
             mark = "[x]" if name in self.chosen else "[ ]"
             here = i == self.cursor
@@ -114,7 +114,7 @@ class ReportScreen:
         lines += [
             L(),
             [(" Window  ", "dim"), (self.window, "val"), ("   Save to  ", "dim"), (str(s.effective_output_dir()), "val")],
-            L(" Change the folder in Settings (6).", "dim"),
+            L(f" Change the folder in Settings ({NUM['settings']}).", "dim"),
             L(),
             [(" r ", "key"), ("HTML report   ", ""), ("c ", "key"), ("CSV   ", ""), ("j ", "key"), ("JSON   ", ""),
              ("o ", "key"), ("open last report in browser", "")],
@@ -127,7 +127,7 @@ class ReportScreen:
 class SettingsScreen:
     name = "settings"
     title = "Settings"
-    hints = "up/down move  enter edit or change  esc cancel edit"
+    hints = "up/down move  Enter edit or change  Esc cancel edit"
 
     def __init__(self, ctx: Context):
         self.ctx = ctx

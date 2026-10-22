@@ -16,11 +16,12 @@ Lacuna measures real packet loss, jitter, RTT and throughput on a live network p
 
   1  Dashboard  what you have measured so far
   2  Probes     run one test right now
-  3  Monitor    keep testing in the background
-  4  Server     be the far end for UDP and throughput tests
-  5  Report     HTML report and CSV or JSON export
-  6  Settings   profile name, folders, refresh rate
-  7  Help       this screen
+  3  Targets    saved addresses with your own operations
+  4  Monitor    keep testing in the background
+  5  Server     be the far end for UDP and throughput tests
+  6  Report     HTML report and CSV or JSON export
+  7  Settings   profile name, folders, refresh rate
+  8  Help       this screen
 
 New here? Go to Probes (2), pick "Offline demo", press Enter. In about 40 seconds you have a full set of simulated data. Then press 1 and d to look at it.
 
@@ -30,8 +31,11 @@ Use the Up and Down arrows to pick a topic on the left. PgUp and PgDn scroll the
     ("Keys", """\
 # Keys that work everywhere
 
-  1 to 7        jump to a screen
+  1 to 8        jump to a screen
   Tab, Shift-Tab  next or previous screen
+  Left, Right   previous or next screen
+  [ and ]       previous or next screen
+  Mouse click   on a tab at the top
   ? or F1       open this help
   q             quit (stops the monitor and server cleanly)
   Ctrl-C        quit
@@ -45,7 +49,8 @@ Use the Up and Down arrows to pick a topic on the left. PgUp and PgDn scroll the
 # Per screen
 
   Dashboard   p profile, w time window, d demo data, r refresh
-  Probes      up/down field, Enter edit, r run, left/right choose
+  Probes      up/down field, Enter edit or choose, r run
+  Targets     n new, Enter open, r run, R run all, x delete operation
   Monitor     s start or stop, l reload config
   Server      s start or stop
   Report      Space toggle profile, a all, w window, r HTML, c CSV, j JSON, o open
@@ -115,6 +120,42 @@ A reply is never larger than the request. Probes need a handshake cookie. Each s
 # Be polite
 
 Only probe hosts you are allowed to probe. Do not leave a public server running without thinking about who can reach it."""),
+    ("Targets and operations", """\
+# What a target is
+
+A target is a saved address with your own list of operations. Use it when you care about one specific machine: your router, a server you manage, a game server, a printer.
+
+# Using it
+
+  3  open the Targets screen
+  n  new target: give it a name and an address
+  Enter  open it, then Enter on a row to edit it
+  + Add operation  choose what to do and how
+
+# Operations
+
+| Operation   | Settings you choose                                   |
+| Ping        | packets, interval                                     |
+| TCP connect | any port, connects, interval                          |
+| UDP         | server port, packets, rate, size                      |
+| Throughput  | server port, seconds, streams, up or down             |
+| HTTP        | a URL, seconds, streams                               |
+
+Every operation has a note field ("check the printer port after 6pm") and a "Repeat every" field.
+
+# Run by hand or on a schedule
+
+Leave "Repeat every" empty to run an operation only when you press r. Set it to 10m or 1h and the Monitor runs it for you. In the CLI:
+
+    lacuna targets
+    lacuna run "office router"
+    lacuna run "office router" --op 2
+
+All the usual limits apply. An operation above a rate cap is refused when you save it.
+
+# Where they are stored
+
+~/.config/lacuna/targets.json. It is plain JSON, so you can back it up or edit it."""),
     ("Setting up a server", """\
 # Two machines, one path
 
@@ -128,7 +169,7 @@ Only probe hosts you are allowed to probe. Do not leave a public server running 
 
 # Testing on one machine
 
-Start the server on screen 4, then use 127.0.0.1:9400 as the target. This only tests your own computer, not a network.
+Start the server on the Server screen (5), then use 127.0.0.1:9400 as the target. This only tests your own computer, not a network.
 
 # Changing ports
 
@@ -148,6 +189,8 @@ A profile is a label for the network you are on: campus-wifi, hotspot, home-fibe
 
 # Jobs
 
+Operations you schedule on a saved target (see the Targets topic) are added automatically.
+
 By default: ping 1.1.1.1, 8.8.8.8 and 9.9.9.9, TCP connects to two of them, and one HTTP download every 15 minutes. To change that, copy examples/lacuna.toml to ~/.config/lacuna/lacuna.toml and edit it. Press l on the Monitor screen to reload."""),
     ("Files and folders", """\
 # Where things live
@@ -157,6 +200,7 @@ By default: ping 1.1.1.1, 8.8.8.8 and 9.9.9.9, TCP connects to two of them, and 
 | Demo data       | ~/.local/share/lacuna/demo.db                  |
 | App settings    | ~/.config/lacuna/settings.json                 |
 | Monitor config  | ~/.config/lacuna/lacuna.toml (optional)        |
+| Saved targets   | ~/.config/lacuna/targets.json                  |
 | Reports         | the folder set in Settings (default: current)  |
 
 The paths follow XDG_DATA_HOME and XDG_CONFIG_HOME when those are set.
@@ -173,7 +217,7 @@ The UDP probe could not reach a Lacuna server. Check the address, that the serve
 
 # The demo says a port is in use
 
-The demo needs the server port and the next 11 ports free. Stop the server on screen 4 or change the port in Settings.
+The demo needs the server port and the next 11 ports free. Stop the server on the Server screen (5) or change the port in Settings.
 
 # Throughput retrans and cwnd are empty
 

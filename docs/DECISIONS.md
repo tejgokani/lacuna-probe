@@ -48,3 +48,11 @@ One line each. Newest decisions at the bottom.
 - Probes and the monitor write to the real database only. The dashboard can show `demo.db` with `d`, and the status line and header say so.
 - Settings are written atomically (temp file, then rename). A damaged or odd settings file falls back to defaults per key.
 - `LacunaServer.start()` now closes the UDP socket if the TCP port is taken. Found when the app tried to start a server on a busy port.
+- Left and Right always switch screens, and Enter (or Space) changes a choice. Earlier, Left and Right changed the value on a choice row, so on the Probes screen the arrows seemed not to switch. `[` and `]`, Tab and a mouse click on a tab also work.
+- Mouse support is only for the tab bar and the wheel. Terminals need Shift held to select text while mouse reporting is on.
+- Custom per-address operations are saved targets, not shell commands. An operation is one of the built-in probes with its own parameters, so every cap and validation still applies and nothing can run an arbitrary program.
+- Host names are checked against a strict pattern before use, and `ping` is called with an argument list and no shell, so a saved address cannot inject a command.
+- An operation with an `every` value is picked up by the monitor, in the app and in `lacuna monitor`. Without it the operation runs only on demand.
+- Scheduled operations have a floor of 5 seconds between runs.
+- Targets are stored in `targets.json` beside `settings.json`. Unknown operation kinds in the file are dropped on load.
+- Targets results go to the real database under the app's profile, the same as Probes.

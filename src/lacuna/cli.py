@@ -15,6 +15,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from lacuna import __version__, export
+from lacuna import targets as targets_mod
 from lacuna.config import (
     DEFAULT_PORT,
     RATE_CAPS,
@@ -131,6 +132,11 @@ def cmd_monitor(args: argparse.Namespace) -> int:
     cfg = load_config(path, args.profile)
     if args.db:
         cfg.db_path = Path(args.db)
+    if not args.no_targets:
+        extra, problems = targets_mod.scheduled_jobs(targets_mod.load())
+        cfg.jobs += extra
+        for msg in problems:
+            print(f"skipped saved target operation: {msg}", file=sys.stderr)
     print(f"lacuna monitor: profile {cfg.profile}, {len(cfg.jobs)} jobs, db {cfg.db_path}")
     for j in cfg.jobs:
         print(f"  every {j.every_s:g}s  {j.label}")
@@ -212,6 +218,54 @@ def cmd_demo(args: argparse.Namespace) -> int:
     print(f"report: {out.resolve()}")
     print(f"data:   {demo_db_path()} (separate from your real database)")
     return 0
+
+
+# ---- saved targets ----
+
+def cmd_targets(args: argparse.Namespace) -> int:
+    saved = targets_mod.load()
+    print(f"saved targets file: {targets_mod.targets_path()}")
+    if not saved:
+        print("no saved targets yet. Add them in the app (run `lacuna`, screen 3).")
+        return 0
+    for t in saved:
+        print(f"\n{t.name}  {t.host}" + (f"   ({t.notes})" if t.notes else ""))
+        for i, op in enumerate(t.ops, 1):
+            when = f"every {op.every}" if op.every else "manual"
+            print(f"  {i}. {op.summary()}  [{when}]")
+    return 0
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    saved = targets_mod.load()
+    target = targets_mod.find(saved, args.target)
+    if target is None:
+        known = ", ".join(t.name for t in saved) or "none"
+        raise ValueError(f"no saved target named {args.target!r}. Known: {known}")
+    ops = target.ops
+    if args.op is not None:
+        if not 1 <= args.op <= len(ops):
+            raise ValueError(f"{target.name} has {len(ops)} operations, so --op must be 1 to {len(ops)}")
+        ops = [ops[args.op - 1]]
+    if not ops:
+        raise ValueError(f"{target.name} has no operations yet")
+    profile = args.profile or default_profile()
+    code = 0
+    for i, op in enumerate(ops, 1):
+        job = targets_mod.op_job(target, op)
+        print(f"[{i}] {op.summary()}")
+        try:
+            out = run_job(job)
+        except RUNTIME_ERRORS as exc:
+            print(f"    FAILED: {exc}")
+            code = 1
+            continue
+        if not args.no_store:
+            with Database(args.db or default_db_path()) as db:
+                store(db, profile, job, out)
+        _print_outcome(args, job, profile, out)
+        print()
+    return code
 
 
 # ---- doctor ----
@@ -335,6 +389,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("monitor", cmd_monitor, "run probes on a schedule until Ctrl+C")
     sp.add_argument("--config", metavar="FILE")
     sp.add_argument("--profile", metavar="NAME")
+    sp.add_argument("--no-targets", action="store_true", help="ignore scheduled operations of saved targets")
     add("tui", cmd_tui, "live terminal dashboard from the database").add_argument("--profile", metavar="NAME")
     sp = add("report", cmd_report, "write the HTML report")
     sp.add_argument("--profile", action="append", metavar="NAME", help="repeat to include several")
@@ -349,6 +404,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--profile", action="append", metavar="NAME")
     sp.add_argument("--since", metavar="AGE")
     sp.add_argument("-o", "--output", metavar="FILE")
+    add("targets", cmd_targets, "list saved targets and their operations")
+    sp = add("run", cmd_run, "run the operations of a saved target", probe)
+    sp.add_argument("target", metavar="NAME", help="name of a saved target (see `lacuna targets`)")
+    sp.add_argument("--op", type=int, metavar="N", help="run only operation N")
     add("doctor", cmd_doctor, "check python, ping, database path and permissions")
     return ap
 

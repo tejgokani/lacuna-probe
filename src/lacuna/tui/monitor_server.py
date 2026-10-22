@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lacuna.config import ConfigError
-from lacuna.tui.core import L, Line, Scroller
+from lacuna.tui.core import NUM, L, Line, Scroller
 from lacuna.tui.services import Context
 
 
@@ -72,6 +72,10 @@ class MonitorScreen:
             src = mon.config_path() or "built-in defaults"
             lines.append([(" Config   ", "dim"), (src, "val")])
             lines.append([(" Profile  ", "dim"), (cfg.profile, "val"), ("   Database  ", "dim"), (str(cfg.db_path), "val")])
+            if mon.target_jobs:
+                lines.append(L(f" {mon.target_jobs} of the jobs below come from your saved targets (Targets screen).", "dim"))
+            for msg in mon.target_problems:
+                lines.append(L(" Skipped: " + msg, "warn"))
             lines.append(L())
             lines.append(L(f" {'every':>8}  job", "dim"))
             for j in cfg.jobs:
@@ -124,7 +128,7 @@ class ServerScreen:
             L(),
             [(" UDP   ", "dim"), (f"{s.server_bind}:{s.server_port}", "val"), ("   echo probes", "dim")],
             [(" TCP   ", "dim"), (f"{s.server_bind}:{s.server_port + 1}", "val"), ("   throughput tests", "dim")],
-            L(" Change bind address and port in Settings (6).", "dim"),
+            L(f" Change bind address and port in Settings ({NUM['settings']}).", "dim"),
             L(),
         ]
         if srv is not None:

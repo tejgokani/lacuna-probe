@@ -8,6 +8,7 @@ from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 
+from lacuna import targets
 from lacuna.config import Config, default_config_path, load_config
 from lacuna.db import Database
 from lacuna.demo import demo_db_path
@@ -23,6 +24,8 @@ class MonitorController:
         self.ctx = ctx
         self.log: deque[str] = deque(maxlen=300)
         self.cfg: Config | None = None
+        self.target_jobs = 0  # jobs that came from saved targets
+        self.target_problems: list[str] = []
         self.monitor: Monitor | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -40,6 +43,9 @@ class MonitorController:
     def load_config(self) -> Config:
         cfg = load_config(self.config_path(), self.ctx.settings.effective_profile())
         cfg.db_path = self.ctx.db_path_real()
+        extra, problems = targets.scheduled_jobs(targets.load())
+        cfg.jobs += extra
+        self.target_jobs, self.target_problems = len(extra), problems
         return cfg
 
     def start(self) -> None:
@@ -47,7 +53,10 @@ class MonitorController:
             return
         self.cfg = self.load_config()  # ConfigError goes to the caller
         self._stop = threading.Event()
-        self.log.append(f"{time.strftime('%H:%M:%S')} started, {len(self.cfg.jobs)} jobs, profile {self.cfg.profile}")
+        self.log.append(f"{time.strftime('%H:%M:%S')} started, {len(self.cfg.jobs)} jobs "
+                        f"({self.target_jobs} from saved targets), profile {self.cfg.profile}")
+        for msg in self.target_problems:
+            self.log.append(f"skipped: {msg}")
         self._thread = threading.Thread(target=self._run, args=(self.cfg, self._stop), daemon=True, name="monitor")
         self._thread.start()
 

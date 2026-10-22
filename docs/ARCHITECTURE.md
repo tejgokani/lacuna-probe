@@ -32,6 +32,7 @@
    |
    +-- dashboard.py        reads the database, profile_summary(), sparklines
    +-- probes.py           form -> build_job() -> monitor.run_job() + store() on a worker Task
+   +-- targets_screen.py  saved targets and their operations
    +-- monitor_server.py   screens for the two background services
    +-- report_settings.py  report.html / export, settings form
    +-- help_screen.py      help center topics
@@ -76,6 +77,9 @@ Wire format and server rules: see the docstrings in `protocol.py` and `server.py
 | `analysis/mathis.py` | Mathis formula and sample pairing |
 | `db.py` | Schema, forward-only migrations, inserts, row queries |
 | `config.py` | TOML, defaults, rate caps, XDG paths |
+| `targets.py` | Saved targets: addresses with custom operations, validation, JSON storage, scheduled jobs for the monitor |
+| `jobs.py` | `build_job`: form-style strings to a validated Job, shared by the CLI-free callers (app, targets) |
+| `fmt.py` | Plain-text result tables shared by the CLI and the app |
 | `monitor.py` | `run_job`, `store`, and the scheduler loop with clean SIGINT and SIGTERM exit |
 | `report/svg.py` | Chart helpers. They emit CSS classes, not colors |
 | `report/html.py` | Aggregation, verdict logic, page assembly |

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Targets: save an address with your own operations (ping, TCP on any port, UDP, throughput, HTTP), each with its own parameters and note, run by hand or on a schedule
+- `lacuna targets` and `lacuna run NAME [--op N]`; `lacuna monitor` also runs scheduled target operations (`--no-targets` to skip)
+- Navigation in the app: Left and Right arrows, `[` and `]`, and mouse clicks on the tabs now switch screens, next to Tab and the number keys. Enter changes a choice
+- Help center topic for targets, 8 screens
+
 ## 0.2.0
 
 - Bare `lacuna` opens a full-screen terminal app: Dashboard, Probes, Monitor, Server, Report, Settings and a Help center

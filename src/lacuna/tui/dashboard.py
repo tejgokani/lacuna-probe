@@ -9,7 +9,7 @@ from lacuna.analysis import gilbert
 from lacuna.db import Database
 from lacuna.demo import demo_db_path
 from lacuna.report.html import Summary, profile_summary
-from lacuna.tui.core import L, Line, Scroller
+from lacuna.tui.core import NUM, L, Line, Scroller
 from lacuna.tui.services import Context
 from lacuna.tui.settings import WINDOW_SECONDS, WINDOWS
 
@@ -197,10 +197,11 @@ class DashboardScreen:
         msgs = [
             "Nothing measured in this window yet.",
             "",
-            "  2  Probes   run a ping, UDP, TCP or throughput test now",
-            "  3  Monitor  keep probing on a schedule in the background",
-            "  2  Probes   choose 'Offline demo' to see how everything looks (about 40 s)",
-            "  7  Help     read how Lacuna works",
+            f"  {NUM['probes']}  Probes   run a ping, UDP, TCP or throughput test now",
+            f"  {NUM['targets']}  Targets  save an address with your own operations",
+            f"  {NUM['monitor']}  Monitor  keep probing on a schedule in the background",
+            f"  {NUM['probes']}  Probes   choose 'Offline demo' to see how everything looks (about 40 s)",
+            f"  {NUM['help']}  Help     read how Lacuna works",
             "",
             "Press w to widen the time window, or p to pick another profile.",
         ]

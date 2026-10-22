@@ -6,12 +6,12 @@ import textwrap
 import time
 from pathlib import Path
 
-from lacuna.config import ConfigError, Job, validate_job
+from lacuna.config import Job
 from lacuna.db import Database, LossSample
 from lacuna.demo import demo_db_path, run_demo
 from lacuna.fmt import format_loss, format_tput
+from lacuna.jobs import JOB_KIND, build_job  # noqa: F401
 from lacuna.monitor import Outcome, run_job, store
-from lacuna.probes import split_host_port
 from lacuna.protocol import MAX_UDP_COUNT
 from lacuna.tui.core import Field, Form, L, Line, Scroller, Task, spinner
 from lacuna.tui.services import Context
@@ -50,50 +50,6 @@ SPECS: dict[str, tuple[str, list[tuple[str, str, str, str]]]] = {
     "demo": ("Offline demo", []),
 }
 KINDS = list(SPECS)
-JOB_KIND = {"ping": "icmp", "udp": "udp", "tcp": "tcp", "throughput": "throughput", "http": "http"}
-
-
-def _num(v: dict[str, str], key: str, cast: type, label: str, low: float = 0, high: float | None = None):
-    try:
-        val = cast(v[key].strip())
-    except ValueError:
-        raise ValueError(f"{label} must be a number") from None
-    if val <= low:
-        raise ValueError(f"{label} must be above {low:g}")
-    if high is not None and val > high:
-        raise ValueError(f"{label} must be at most {high:g}")
-    return val
-
-
-def build_job(kind: str, v: dict[str, str]) -> Job:
-    """Validate form values the same way the CLI does, without --unsafe-rate."""
-    target = v["target"].strip()
-    if not target:
-        raise ValueError("enter a target first")
-    params: dict = {}
-    if kind in ("ping", "tcp"):
-        params = {"count": _num(v, "count", int, "packets", 0, 10000),
-                  "interval": _num(v, "interval", float, "interval")}
-    elif kind == "udp":
-        params = {"count": _num(v, "count", int, "packets", 0, MAX_UDP_COUNT),
-                  "pps": _num(v, "pps", float, "packets/s"),
-                  "size": _num(v, "size", int, "packet bytes", 31, 1400)}
-    else:
-        params = {"secs": _num(v, "secs", float, "seconds", 0, 60),
-                  "streams": _num(v, "streams", int, "streams", 0, 16 if kind == "http" else 8)}
-        if kind == "throughput":
-            params["direction"] = v["direction"]
-    if kind in ("udp", "tcp", "throughput"):
-        split_host_port(target)
-    job = Job(JOB_KIND[kind], target, 0, params)
-    try:
-        validate_job(job)
-    except ConfigError as exc:
-        msg = str(exc).split(". Pass --unsafe-rate")[0]
-        raise ValueError(msg + ". Use the CLI with --unsafe-rate to go higher.") from None
-    return job
-
-
 def _probe_and_store(job: Job, profile: str, db_path: Path) -> tuple[Job, Outcome]:
     out = run_job(job)
     with Database(db_path) as db:
@@ -104,7 +60,7 @@ def _probe_and_store(job: Job, profile: str, db_path: Path) -> tuple[Job, Outcom
 class ProbesScreen:
     name = "probes"
     title = "Probes"
-    hints = "up/down field  enter edit/run  left/right choose  r run  pgup/pgdn result"
+    hints = "up/down field  Enter edit, choose or run  r run  pgup/pgdn result"
 
     def __init__(self, ctx: Context):
         self.ctx = ctx
@@ -118,6 +74,8 @@ class ProbesScreen:
         self.demo_log: list[str] = []
         self.scroll = Scroller()
         self._total = self._h = 0
+
+    background = True
 
     @property
     def captures_text(self) -> bool:

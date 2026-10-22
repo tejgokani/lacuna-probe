@@ -41,15 +41,36 @@ Run `lacuna` with no arguments in a terminal and a full-screen app opens. Everyt
 |---|---|---|
 | 1 Dashboard | `p` profile, `w` window, `d` demo data | Live loss, RTT, jitter, throughput, burst verdict and sparklines |
 | 2 Probes | `Enter` edit, `r` run | Ping, UDP, TCP, throughput and HTTP tests from a form, plus the offline demo |
-| 3 Monitor | `s` start or stop | Runs your probe jobs on a schedule in the background, with a live log |
-| 4 Server | `s` start or stop | Be the far end for UDP and throughput tests, see live sessions |
-| 5 Report | `r` HTML, `c` CSV, `j` JSON, `o` open | Pick profiles and a time window, write files |
-| 6 Settings | `Enter` edit | Profile name, database, refresh rate, server port, folders, colors. Saved as you go |
-| 7 Help | `?` from anywhere | Help center: probes explained, reading the numbers, safety, troubleshooting |
+| 3 Targets | `n` new, `Enter` open, `r` run | Saved addresses with your own operations, run by hand or on a schedule (see below) |
+| 4 Monitor | `s` start or stop | Runs your probe jobs on a schedule in the background, with a live log |
+| 5 Server | `s` start or stop | Be the far end for UDP and throughput tests, see live sessions |
+| 6 Report | `r` HTML, `c` CSV, `j` JSON, `o` open | Pick profiles and a time window, write files |
+| 7 Settings | `Enter` edit | Profile name, database, refresh rate, server port, folders, colors. Saved as you go |
+| 8 Help | `?` from anywhere | Help center: probes explained, reading the numbers, safety, troubleshooting |
 
-`1` to `7` jump between screens, `Tab` cycles, `q` quits and stops anything it started. The app enforces the same rate caps as the CLI. It needs a terminal of at least 60 by 14. It uses `curses` from the standard library, so there is nothing extra to install.
+Switch screens with `1` to `8`, `Tab` or `Shift-Tab`, the Left and Right arrows, `[` and `]`, or a mouse click on a tab. `Enter` changes a choice such as the probe type. `q` quits and stops anything the app started. Mouse capture means you hold `Shift` to select text in most terminals. The app enforces the same rate caps as the CLI. It needs a terminal of at least 60 by 14. It uses `curses` from the standard library, so there is nothing extra to install.
 
 New here? Press `2`, move to the probe selector, choose "Offline demo", press `Enter`, then `1` and `d` once it finishes.
+
+### Custom operations for a specific address
+
+Open Targets (`3`) and press `n` to save an address, for example your router, a server you manage or a game server. A target holds your own list of operations, each with its own settings and a note:
+
+| Operation | Settings you choose |
+|---|---|
+| Ping | packets, interval |
+| TCP connect | any port, connects, interval |
+| UDP | server port, packets, rate, packet size |
+| Throughput | server port, seconds, streams, up or down |
+| HTTP | a URL (use `{host}` for the address), seconds, streams |
+
+Leave "Repeat every" empty to run an operation only when you press `r` (or `R` for all of them). Set it to `10m` or `1h` and the monitor runs it on schedule, in the app or with `lacuna monitor`. The same limits apply: an operation above a rate cap is refused when you save it. Targets are stored in `~/.config/lacuna/targets.json`.
+
+```bash
+lacuna targets                          # list saved targets and operations
+lacuna run "office router"              # run all operations of a target
+lacuna run "office router" --op 2       # run only operation 2
+```
 
 ## How it fits together
 
@@ -89,6 +110,8 @@ New here? Press `2`, move to the probe selector, choose "Offline demo", press `E
 | `lacuna report` | Build the HTML report |
 | `lacuna compare A B` | Two profiles side by side in the terminal |
 | `lacuna export` | CSV or JSON dump |
+| `lacuna targets` | List saved targets and their operations |
+| `lacuna run NAME` | Run the operations of a saved target |
 | `lacuna doctor` | Check Python, ping, database path, permissions |
 
 Every probe command prints a table, stores the result, and takes `--profile NAME`, `--no-store`, `--json`. Full flag list: [docs/CLI.md](docs/CLI.md).

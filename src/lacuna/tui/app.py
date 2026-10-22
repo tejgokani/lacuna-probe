@@ -7,15 +7,16 @@ import time
 
 from lacuna import __version__
 from lacuna.tui import settings as settings_mod
-from lacuna.tui.core import L, Line, clip, pad
+from lacuna.tui.core import NUM, L, Line, clip, pad
 from lacuna.tui.dashboard import DashboardScreen
 from lacuna.tui.help_screen import HelpScreen
 from lacuna.tui.monitor_server import MonitorScreen, ServerScreen
 from lacuna.tui.probes import ProbesScreen
 from lacuna.tui.report_settings import ReportScreen, SettingsScreen
 from lacuna.tui.services import Context
+from lacuna.tui.targets_screen import TargetsScreen
 
-MIN_W, MIN_H = 60, 14
+MIN_W, MIN_H = 64, 14
 STATUS_SECONDS = 5.0
 
 
@@ -24,9 +25,10 @@ class App:
 
     def __init__(self, ctx: Context | None = None):
         self.ctx = ctx or Context(settings_mod.load())
-        self.screens = [DashboardScreen(self.ctx), ProbesScreen(self.ctx), MonitorScreen(self.ctx),
-                        ServerScreen(self.ctx), ReportScreen(self.ctx), SettingsScreen(self.ctx),
-                        HelpScreen(self.ctx)]
+        self.screens = [DashboardScreen(self.ctx), ProbesScreen(self.ctx), TargetsScreen(self.ctx),
+                        MonitorScreen(self.ctx), ServerScreen(self.ctx), ReportScreen(self.ctx),
+                        SettingsScreen(self.ctx), HelpScreen(self.ctx)]
+        assert [NUM[s.name] for s in self.screens] == list(range(1, len(self.screens) + 1))
         self.current = 0
         self.quit = False
         self.ctx.switch = self.go
@@ -37,14 +39,10 @@ class App:
         return self.screens[self.current]
 
     def go(self, name: str) -> None:
-        for i, s in enumerate(self.screens):
-            if s.name == name:
-                self.current = i
-                s.on_show()
-                return
+        self._show(next(i for i, s in enumerate(self.screens) if s.name == name))
 
-    def _step(self, delta: int) -> None:
-        self.current = (self.current + delta) % len(self.screens)
+    def _show(self, index: int) -> None:
+        self.current = index % len(self.screens)
         self.screen.on_show()
 
     # ---- input ----
@@ -55,6 +53,9 @@ class App:
         if key == "ctrl-c":
             self.quit = True
             return
+        if key.startswith("mouse:"):
+            self._click(key)
+            return
         if self.screen.captures_text:
             self.screen.key(key)
             return
@@ -62,39 +63,61 @@ class App:
             self.quit = True
         elif key in ("?", "f1"):
             self.go("help")
-        elif len(key) == 1 and key in "1234567":
-            self.current = int(key) - 1
-            self.screen.on_show()
-        elif key == "tab":
-            self._step(1)
-        elif key == "btab":
-            self._step(-1)
+        elif len(key) == 1 and key.isdigit() and 1 <= int(key) <= len(self.screens):
+            self._show(int(key) - 1)
+        elif key in ("tab", "]", "right"):
+            self._show(self.current + 1)
+        elif key in ("btab", "[", "left"):
+            self._show(self.current - 1)
         else:
             self.screen.key(key)
 
+    def _click(self, key: str) -> None:
+        _, x, y = key.split(":")
+        if int(y) != 0:
+            return
+        for start, end, index in self.tab_spans(self._width):
+            if start <= int(x) < end:
+                self._show(index)
+                return
+
     def tick(self) -> None:
+        now = time.time()
         for s in self.screens:
-            if s is self.screen:
-                s.tick(time.time())
-            elif s.name == "probes":
-                s.tick(time.time())  # let a finished probe report even when you look elsewhere
+            if s is self.screen or getattr(s, "background", False):
+                s.tick(now)
 
     def shutdown(self) -> None:
         self.ctx.shutdown()
 
     # ---- drawing ----
 
-    def tab_bar(self, w: int) -> Line:
-        compact = w < 96
-        bar: Line = [(" lacuna ", "title")]
+    _width = 120
+
+    def _labels(self, w: int) -> list[tuple[int, str]]:
+        compact = w < 100
+        out = []
         for i, s in enumerate(self.screens):
             label = s.title[:4] if compact and i != self.current else s.title
             live = ""
-            if s.name == "monitor" and self.ctx.monitor.running:
+            if (s.name == "monitor" and self.ctx.monitor.running) or (s.name == "server" and self.ctx.server.running):
                 live = " *"
-            if s.name == "server" and self.ctx.server.running:
-                live = " *"
-            bar.append((f" {i + 1} {label}{live} ", "tabsel" if i == self.current else "tab"))
+            out.append((i, f" {i + 1} {label}{live} "))
+        return out
+
+    def tab_spans(self, w: int) -> list[tuple[int, int, int]]:
+        x = len(" lacuna ")
+        spans = []
+        for i, text in self._labels(w):
+            spans.append((x, x + len(text), i))
+            x += len(text)
+        return spans
+
+    def tab_bar(self, w: int) -> Line:
+        self._width = w
+        bar: Line = [(" lacuna ", "title")]
+        for i, text in self._labels(w):
+            bar.append((text, "tabsel" if i == self.current else "tab"))
         return pad(clip(bar, w), w, "tab")
 
     def status_bar(self, w: int) -> Line:
@@ -104,7 +127,7 @@ class App:
         return pad(clip(L(" " + self.screen.hints, "dim"), w), w)
 
     def footer(self, w: int) -> Line:
-        text = " ? help   Tab next   1-7 screens   q quit"
+        text = f" ? help   Tab or left/right: next screen   1-{len(self.screens)} jump   q quit"
         right = f"lacuna {__version__} "
         gap = max(1, w - len(text) - len(right))
         return clip([(text, "key"), (" " * gap, ""), (right, "dim")], w)
@@ -115,9 +138,10 @@ class App:
                    L(" Make the window larger, or press q to quit.", "dim")]
             return (msg + [L()] * h)[:h]
         body_h = h - 3
+        bar = self.tab_bar(w)
         body = [clip(ln, w) for ln in self.screen.render(w, body_h)][:body_h]
         body += [L()] * (body_h - len(body))
-        return [self.tab_bar(w)] + body + [self.status_bar(w), self.footer(w)]
+        return [bar] + body + [self.status_bar(w), self.footer(w)]
 
 
 # ---- curses driver ----
@@ -135,6 +159,8 @@ def normalize(ch) -> str | None:
     import curses
 
     if isinstance(ch, int):
+        if ch == curses.KEY_MOUSE:
+            return _mouse()
         return KEYMAP.get(curses.keyname(ch).decode("ascii", "replace"))
     if ch in ("\n", "\r"):
         return "enter"
@@ -147,6 +173,23 @@ def normalize(ch) -> str | None:
     if ch == "\x03":
         return "ctrl-c"
     return ch if ch.isprintable() else None
+
+
+def _mouse() -> str | None:
+    """A left click becomes "mouse:X:Y", the wheel becomes up and down."""
+    import curses
+
+    try:
+        _, x, y, _, state = curses.getmouse()
+    except curses.error:
+        return None
+    if state & (curses.BUTTON1_CLICKED | curses.BUTTON1_PRESSED):
+        return f"mouse:{x}:{y}"
+    if state & getattr(curses, "BUTTON4_PRESSED", 0):
+        return "up"
+    if state & getattr(curses, "BUTTON5_PRESSED", 0):
+        return "down"
+    return None
 
 
 def _styles(color: bool) -> dict[str, int]:
@@ -193,6 +236,7 @@ def _loop(scr, app: App) -> None:
 
     curses.curs_set(0)
     scr.keypad(True)
+    curses.mousemask(curses.ALL_MOUSE_EVENTS)  # clicks on the tab bar; hold Shift to select text
     scr.timeout(150)
     color = app.ctx.settings.color
     attrs = _styles(color)

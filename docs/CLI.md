@@ -78,7 +78,7 @@ lacuna throughput --url "https://speed.cloudflare.com/__down?bytes=10000000"
 ## monitor
 
 ```bash
-lacuna monitor [--config FILE] [--profile NAME]
+lacuna monitor [--config FILE] [--profile NAME] [--no-targets]
 ```
 
 Runs the jobs in the config on schedule until Ctrl+C or SIGTERM. Config lookup order: `--config`, then `~/.config/lacuna/lacuna.toml` if it exists, then built-in defaults (3 ICMP, 2 TCP connect, 1 HTTP download). A failing job is logged and retried at its next slot. See [examples/lacuna.toml](../examples/lacuna.toml). For a systemd user service see [examples/lacuna-monitor.service](../examples/lacuna-monitor.service).
@@ -104,11 +104,32 @@ lacuna tui [--profile NAME] [--db FILE]
 
 `lacuna` with no arguments, in a terminal, opens the full-screen app. `lacuna tui` does the same and accepts `--db` and `--profile` for that session only. Without a terminal (piped output, no TTY) `lacuna` prints help and `lacuna tui` prints one plain dashboard snapshot.
 
-Screens: Dashboard, Probes, Monitor, Server, Report, Settings, Help. Jump with `1` to `7`, cycle with `Tab`, open help with `?`, quit with `q` or Ctrl+C.
+Screens: 1 Dashboard, 2 Probes, 3 Targets, 4 Monitor, 5 Server, 6 Report, 7 Settings, 8 Help. Switch with `1` to `8`, `Tab` and `Shift-Tab`, the Left and Right arrows, `[` and `]`, or a mouse click on a tab. `Enter` changes a choice. Open help with `?`, quit with `q` or Ctrl+C.
 
 Settings are stored in `$XDG_CONFIG_HOME/lacuna/settings.json` (`~/.config/lacuna/settings.json`) and apply to the app only: profile name, database file, default window, refresh seconds, monitor config path, server bind and port, report folder, colors. The app never offers `--unsafe-rate`.
 
 Probes run from the app are stored in your real database. The offline demo and the Dashboard's demo view use `demo.db` and never touch it.
+
+## targets and run
+
+```bash
+lacuna targets
+lacuna run NAME [--op N] [--profile NAME] [--no-store] [--json]
+lacuna run "office router" --op 2
+```
+
+Saved targets are an address plus your own operations (ping, TCP connect to a chosen port, UDP, throughput, HTTP), each with its own parameters, a note, and an optional `every` schedule. Create and edit them in the app (screen 3). `lacuna targets` lists them and `lacuna run` runs all of a target's operations, or one with `--op`. Operations are validated with the same rate caps as the other commands, and there is no `--unsafe-rate` here.
+
+`lacuna monitor` also runs every operation that has a schedule, in addition to the jobs in its config. Use `lacuna monitor --no-targets` to leave them out. The file is `$XDG_CONFIG_HOME/lacuna/targets.json`:
+
+```json
+{"version": 1, "targets": [
+  {"name": "office router", "host": "10.0.0.1", "notes": "",
+   "ops": [{"kind": "tcp", "label": "SSH reachable", "params": {"port": "22"}, "every": "10m"}]}
+]}
+```
+
+Operation kinds: `ping`, `tcp`, `udp`, `throughput`, `http`. The parameter names for each kind are the field names in the app's operation form (for example `port`, `count`, `interval`, `secs`, `streams`, `url`).
 
 ## report
 

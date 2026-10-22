@@ -1,14 +1,13 @@
 import contextlib
 import io
 import json
-import os
-import tempfile
 import time
 import unittest
-from pathlib import Path
+
+from support import PORT, Env
 
 from lacuna import cli
-from lacuna.db import Database, LossSample, TputSample
+from lacuna.db import Database
 from lacuna.server import LacunaServer
 from lacuna.tui import build_lines, sparkline
 from lacuna.tui import settings as S
@@ -16,52 +15,7 @@ from lacuna.tui.app import MIN_H, MIN_W, App, normalize
 from lacuna.tui.core import Editor, Field, Form, Scroller, Task, plain, side_by_side, wrap_block
 from lacuna.tui.help_screen import TOPICS, render_topic
 from lacuna.tui.probes import build_job
-from lacuna.tui.services import Context
-
-PORT = 9470
-
-
-class Env(unittest.TestCase):
-    """Isolated XDG dirs and a fresh Context per test."""
-
-    def setUp(self):
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        self.tmp = Path(tmp.name)
-        saved = {k: os.environ.get(k) for k in ("XDG_DATA_HOME", "XDG_CONFIG_HOME")}
-        os.environ["XDG_DATA_HOME"] = str(self.tmp / "data")
-        os.environ["XDG_CONFIG_HOME"] = str(self.tmp / "conf")
-        self.addCleanup(self._restore, saved)
-        self.settings = S.Settings(db_path=str(self.tmp / "t.db"), output_dir=str(self.tmp / "out"),
-                                   server_bind="127.0.0.1", server_port=PORT)
-        self.ctx = Context(self.settings)
-        self.addCleanup(self.ctx.shutdown)
-
-    @staticmethod
-    def _restore(saved):
-        for k, v in saved.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
-
-    def seed(self, profile="wifi", n=3):
-        with Database(self.settings.db_path) as db:
-            for i in range(n):
-                rid = db.add_run(profile, "icmp", "1.1.1.1", ts=time.time() - 60 * (n - i))
-                db.add_loss(rid, LossSample(100, 98, 2.0, rtt_p50=10.0, rtt_p95=14.0, jitter_ms=0.7,
-                                            max_burst=2, loss_bits_hex="00" * 13))
-            rid = db.add_run(profile, "throughput", "h:1", ts=time.time() - 30)
-            db.add_tput(rid, TputSample("down", 1, 5.0, 1_000_000, 42.0))
-
-    def wait(self, screen, timeout=15.0):
-        end = time.time() + timeout
-        while time.time() < end:
-            screen.tick(time.time())
-            if getattr(screen, "task", None) is None:
-                return
-            time.sleep(0.05)
-        self.fail("task did not finish")
+from lacuna.tui.services import Context  # noqa: F401
 
 
 class CoreTests(unittest.TestCase):
@@ -234,8 +188,8 @@ class AppTests(Env):
         self.app = App(self.ctx)
 
     def test_every_screen_renders_at_several_sizes(self):
-        for w, h in ((60, 14), (80, 24), (100, 28), (140, 50)):
-            for key in "1234567":
+        for w, h in ((64, 14), (80, 24), (100, 28), (140, 50)):
+            for key in "12345678":
                 self.app.handle(key)
                 lines = self.app.compose(w, h)
                 self.assertEqual(len(lines), h)
@@ -248,27 +202,60 @@ class AppTests(Env):
         self.assertEqual(len(self.app.compose(20, 5)), 5)
 
     def test_navigation_keys(self):
-        self.app.handle("3")
+        self.app.handle("4")
         self.assertEqual(self.app.screen.name, "monitor")
         self.app.handle("tab")
         self.assertEqual(self.app.screen.name, "server")
         self.app.handle("btab")
         self.app.handle("btab")
-        self.assertEqual(self.app.screen.name, "probes")
+        self.assertEqual(self.app.screen.name, "targets")
         self.app.handle("?")
         self.assertEqual(self.app.screen.name, "help")
         self.app.handle("1")
-        self.app.handle("tab")
-        for _ in range(7):
+        for _ in range(8):
             self.app.handle("tab")
-        self.assertEqual(self.app.screen.name, "probes")
+        self.assertEqual(self.app.screen.name, "dashboard")
         self.app.handle("resize")
         self.assertFalse(self.app.quit)
         self.app.handle("q")
         self.assertTrue(self.app.quit)
 
+    def test_arrows_brackets_and_mouse_switch_screens(self):
+        names = [s.name for s in self.app.screens]
+        self.app.handle("right")
+        self.assertEqual(self.app.screen.name, names[1])
+        self.app.handle("right")
+        self.assertEqual(self.app.screen.name, names[2])
+        self.app.handle("left")
+        self.assertEqual(self.app.screen.name, names[1])
+        self.app.handle("]")
+        self.app.handle("[")
+        self.assertEqual(self.app.screen.name, names[1])
+        self.app.handle("1")
+        self.app.handle("left")  # wraps around
+        self.assertEqual(self.app.screen.name, names[-1])
+        self.app.compose(120, 30)
+        spans = self.app.tab_spans(120)
+        self.assertEqual(len(spans), 8)
+        start, end, index = spans[3]
+        self.app.handle(f"mouse:{start + 1}:0")
+        self.assertEqual(self.app.screen.name, names[index])
+        self.app.handle(f"mouse:{start + 1}:5")  # a click below the tab bar does nothing
+        self.assertEqual(self.app.screen.name, names[index])
+        self.app.handle("mouse:0:0")  # the "lacuna" label is not a tab
+        self.assertEqual(self.app.screen.name, names[index])
+
+    def test_enter_changes_a_choice_and_arrows_still_switch_screens(self):
+        self.app.handle("2")
+        before = self.app.screen.form.fields[0].value
+        self.app.handle("enter")
+        self.assertEqual(self.app.screen.name, "probes")
+        self.assertNotEqual(self.app.screen.form.fields[0].value, before)
+        self.app.handle("right")
+        self.assertEqual(self.app.screen.name, "targets")
+
     def test_typing_does_not_trigger_global_keys(self):
-        self.app.handle("6")
+        self.app.handle("7")
         self.app.handle("enter")  # start editing the profile
         self.assertTrue(self.app.screen.captures_text)
         for k in "q1?":
@@ -280,7 +267,7 @@ class AppTests(Env):
         self.assertEqual(S.load().profile, "q1?")
 
     def test_ctrl_c_always_quits(self):
-        self.app.handle("6")
+        self.app.handle("7")
         self.app.handle("enter")
         self.app.handle("ctrl-c")
         self.assertTrue(self.app.quit)
@@ -357,7 +344,7 @@ class ProbesScreenTests(Env):
         for _ in range(8):
             if self.screen.form.fields[0].value == label:
                 return
-            self.screen.key("right")
+            self.screen.key("enter")
         self.fail("probe not found")
 
     def test_validation_error_is_shown_not_run(self):
@@ -420,7 +407,7 @@ class ProbesScreenTests(Env):
 class ServicesTests(Env):
     def test_server_screen(self):
         self.app = App(self.ctx)
-        self.app.handle("4")
+        self.app.handle("5")
         self.app.handle("s")
         self.assertTrue(self.ctx.server.running)
         self.assertIn("LISTENING", "\n".join(plain(self.app.compose(100, 28))))
@@ -431,7 +418,7 @@ class ServicesTests(Env):
         blocker = LacunaServer("127.0.0.1", PORT).start()
         self.addCleanup(blocker.stop)
         app = App(self.ctx)
-        app.handle("4")
+        app.handle("5")
         app.handle("s")
         self.assertFalse(self.ctx.server.running)
         self.assertIn("Could not start", self.ctx.status[0])
@@ -444,7 +431,7 @@ class ServicesTests(Env):
                        "count = 30\npps = 150\n")
         self.settings.config_path = str(cfg)
         app = App(self.ctx)
-        app.handle("3")
+        app.handle("4")
         app.handle("s")
         self.assertTrue(self.ctx.monitor.running)
         end = time.time() + 15
@@ -467,7 +454,7 @@ class ServicesTests(Env):
         bad.write_text('[[job]]\nkind = "nope"\ntarget = "x"\n')
         self.settings.config_path = str(bad)
         app = App(self.ctx)
-        app.handle("3")
+        app.handle("4")
         app.handle("s")
         self.assertFalse(self.ctx.monitor.running)
         self.assertIn("kind must be", "\n".join(plain(app.compose(100, 28))))
@@ -478,7 +465,7 @@ class ReportAndSettingsScreenTests(Env):
         self.seed("a")
         self.seed("b")
         app = App(self.ctx)
-        app.handle("5")
+        app.handle("6")
         scr = app.screen
         self.assertEqual(scr.chosen, {"a", "b"})
         app.handle(" ")
@@ -493,7 +480,7 @@ class ReportAndSettingsScreenTests(Env):
 
     def test_report_needs_a_profile_and_a_report_to_open(self):
         app = App(self.ctx)
-        app.handle("5")
+        app.handle("6")
         app.handle("r")
         self.assertIn("Select at least one", app.screen.message[0])
         app.handle("o")
@@ -501,7 +488,7 @@ class ReportAndSettingsScreenTests(Env):
 
     def test_settings_screen_edits_and_rejects(self):
         app = App(self.ctx)
-        app.handle("6")
+        app.handle("7")
         scr = app.screen
         keys = ["down"] * 3  # refresh row
         for k in keys:
@@ -524,7 +511,7 @@ class ReportAndSettingsScreenTests(Env):
     def test_settings_reset(self):
         S.apply(self.settings, "profile", "zzz")
         app = App(self.ctx)
-        app.handle("6")
+        app.handle("7")
         for _ in range(9):
             app.handle("down")
         app.handle("enter")
@@ -548,7 +535,7 @@ class HelpTests(Env):
 
     def test_navigation_and_scroll(self):
         app = App(Context(S.Settings()))
-        app.handle("7")
+        app.handle("8")
         h = app.screen
         app.handle("down")
         self.assertEqual(h.topic, 1)

@@ -15,6 +15,9 @@ from typing import Any
 Seg = tuple[str, str]  # (text, style)
 Line = list[Seg]
 
+# screen name -> key that jumps to it. The app builds its tab order from this.
+NUM = {"dashboard": 1, "probes": 2, "targets": 3, "monitor": 4, "server": 5, "report": 6, "settings": 7, "help": 8}
+
 # styles: "", title, hdr, sel, dim, ok, warn, err, key, val, tab, tabsel
 
 
@@ -200,8 +203,9 @@ class Form:
                     shown = f"< {shown} >"
                 value = [(shown, "val" if here else "")]
             row = [marker, label] + value
-            if f.hint and here and self.editor is None:
-                row.append(("   " + f.hint, "dim"))
+            hint = f.hint or ("Enter to change" if f.kind == "choice" else "")
+            if hint and here and self.editor is None:
+                row.append(("   " + hint, "dim"))
             rows.append(row)
         return rows
 
